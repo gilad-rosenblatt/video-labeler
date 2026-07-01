@@ -10,7 +10,11 @@ from labeler.annotation_io import (
     default_annotation_path,
     read_annotations,
 )
-from labeler.geometry import annotation_bbox_to_xywh
+from labeler.geometry import (
+    annotation_bbox_to_xywh,
+    clamp_xywh_to_frame,
+    is_valid_xywh,
+)
 from labeler.video import get_frame_count, open_video, read_frame_at
 
 
@@ -19,6 +23,8 @@ Frame = np.ndarray
 WINDOW_NAME = "Annotation Validator"
 
 FONT = int(getattr(cv2, "FONT_HERSHEY_SIMPLEX", 0))
+LINE_AA = int(getattr(cv2, "LINE_AA", 16))
+
 WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
 YELLOW = (0, 255, 255)
@@ -54,6 +60,41 @@ def get_annotation_for_frame(
     return annotations[frame_index]
 
 
+def clamp_frame_index(frame_index: int, frame_count: int) -> int:
+    """Clamp a frame index to the valid video frame range."""
+    if frame_count <= 0:
+        raise ValueError(f"Frame count must be positive, got {frame_count}")
+
+    return max(0, min(frame_index, frame_count - 1))
+
+
+def next_frame_index_for_key(
+    key: int,
+    frame_index: int,
+    frame_count: int,
+) -> int | None:
+    """Return next frame index for a keyboard command.
+
+    Returns None when the user requested quit.
+    """
+    if key in {ord("q"), 27}:  # Esc
+        return None
+
+    if key == ord("n"):
+        return clamp_frame_index(frame_index + 1, frame_count)
+
+    if key == ord("N"):
+        return clamp_frame_index(frame_index + 10, frame_count)
+
+    if key == ord("p"):
+        return clamp_frame_index(frame_index - 1, frame_count)
+
+    if key == ord("P"):
+        return clamp_frame_index(frame_index - 10, frame_count)
+
+    return frame_index
+
+
 def draw_text(
     frame: Frame,
     text: str,
@@ -69,7 +110,7 @@ def draw_text(
         0.6,
         color,
         2,
-        cv2.LINE_AA,
+        LINE_AA,
     )
 
 
@@ -79,7 +120,7 @@ def draw_annotation_overlay(
 ) -> None:
     """Draw the frame annotation overlay in place."""
     if annotation is None:
-        draw_text(frame, "UNLABELED", (10, 70), YELLOW)
+        draw_text(frame, "UNLABELED", (10, 90), YELLOW)
         return
 
     if annotation.status == "V":
@@ -89,22 +130,37 @@ def draw_annotation_overlay(
             annotation.width,
             annotation.height,
         )
-        cv2.rectangle(
-            frame,
-            (x, y),
-            (x + width, y + height),
-            GREEN,
-            2,
+
+        frame_height, frame_width = frame.shape[:2]
+        x, y, width, height = clamp_xywh_to_frame(
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            frame_width=frame_width,
+            frame_height=frame_height,
         )
-        draw_text(frame, "VISIBLE", (10, 70), GREEN)
+
+        if is_valid_xywh(x, y, width, height):
+            cv2.rectangle(
+                frame,
+                (x, y),
+                (x + width, y + height),
+                GREEN,
+                2,
+            )
+            draw_text(frame, "VISIBLE", (10, 90), GREEN)
+        else:
+            draw_text(frame, "VISIBLE - INVALID BBOX", (10, 90), RED)
+
         return
 
     if annotation.status == "S":
-        draw_text(frame, "SKIPPED", (10, 70), YELLOW)
+        draw_text(frame, "SKIPPED", (10, 90), YELLOW)
         return
 
     if annotation.status == "I":
-        draw_text(frame, "INVISIBLE", (10, 70), RED)
+        draw_text(frame, "INVISIBLE", (10, 90), RED)
         return
 
     raise ValueError(f"Unexpected annotation status: {annotation.status}")
@@ -120,7 +176,8 @@ def make_display_frame(
     display = frame.copy()
 
     draw_text(display, f"Frame {frame_index + 1} / {frame_count}", (10, 25))
-    draw_text(display, "Controls: q or Esc = quit", (10, 45))
+    draw_text(display, "Controls: n next | N +10 | p prev | P -10 | q quit", (10, 50))
+    draw_text(display, "Status:", (10, 75))
     draw_annotation_overlay(display, annotation)
 
     return display
@@ -140,25 +197,37 @@ def run(argv: Sequence[str] | None = None) -> int:
 
     try:
         frame_count = get_frame_count(capture)
-        frame = read_frame_at(capture, 0)
+        if frame_count <= 0:
+            raise ValueError(f"Video has no frames: {video_path}")
 
-        if frame is None:
-            raise ValueError(f"Could not read first frame from video: {video_path}")
-
-        annotation = get_annotation_for_frame(annotations, 0)
-        display = make_display_frame(
-            frame=frame,
-            frame_index=0,
-            frame_count=frame_count,
-            annotation=annotation,
-        )
-
-        cv2.imshow(WINDOW_NAME, display)
+        frame_index = 0
 
         while True:
+            frame = read_frame_at(capture, frame_index)
+            if frame is None:
+                raise ValueError(f"Could not read frame {frame_index} from video: {video_path}")
+
+            annotation = get_annotation_for_frame(annotations, frame_index)
+            display = make_display_frame(
+                frame=frame,
+                frame_index=frame_index,
+                frame_count=frame_count,
+                annotation=annotation,
+            )
+
+            cv2.imshow(WINDOW_NAME, display)
+
             key = cv2.waitKey(0) & 0xFF
-            if key in {ord("q"), 27}:  # 27 = Esc
+            next_index = next_frame_index_for_key(
+                key=key,
+                frame_index=frame_index,
+                frame_count=frame_count,
+            )
+
+            if next_index is None:
                 break
+
+            frame_index = next_index
 
     finally:
         capture.release()
