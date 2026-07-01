@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "skyways-cv-labeler"
+name = "labeler"
 version = "0.1.0"
 description = "Interactive single-object video labeling and annotation validation tools"
 requires-python = ">=3.10"
@@ -19,8 +19,8 @@ dev = [
 ]
 
 [project.scripts]
-skyways-label = "skyways_cv_labeler.label_tool:main"
-skyways-validate = "skyways_cv_labeler.validate_tool:main"
+label = "labeler.label_tool:main"
+validate = "labeler.validate_tool:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

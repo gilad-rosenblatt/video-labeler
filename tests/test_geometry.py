@@ -1,4 +1,4 @@
-from skyways_cv_labeler.geometry import (
+from labeler.geometry import (
     annotation_bbox_to_xywh,
     center_drag_to_xywh,
     clamp_xywh_to_frame,

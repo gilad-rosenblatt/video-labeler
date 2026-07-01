@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from skyways_cv_labeler.annotation_io import (
+from labeler.annotation_io import (
     Annotation,
     default_annotation_path,
     format_annotation,
