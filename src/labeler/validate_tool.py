@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Sequence
 
 import cv2
-import numpy as np
 
 from labeler.annotation_io import (
     Annotation,
@@ -15,20 +14,19 @@ from labeler.geometry import (
     clamp_xywh_to_frame,
     is_valid_xywh,
 )
+from labeler.ui import (
+    Frame,
+    GREEN,
+    RED,
+    WHITE,
+    YELLOW,
+    draw_bbox,
+    draw_text,
+)
 from labeler.video import get_frame_count, open_video, read_frame_at
 
 
-Frame = np.ndarray
-
 WINDOW_NAME = "Annotation Validator"
-
-FONT = int(getattr(cv2, "FONT_HERSHEY_SIMPLEX", 0))
-LINE_AA = int(getattr(cv2, "LINE_AA", 16))
-
-WHITE = (255, 255, 255)
-GREEN = (0, 255, 0)
-YELLOW = (0, 255, 255)
-RED = (0, 0, 255)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -95,25 +93,6 @@ def next_frame_index_for_key(
     return frame_index
 
 
-def draw_text(
-    frame: Frame,
-    text: str,
-    origin: tuple[int, int],
-    color: tuple[int, int, int] = WHITE,
-) -> None:
-    """Draw one text line on a frame."""
-    cv2.putText(
-        frame,
-        text,
-        origin,
-        FONT,
-        0.6,
-        color,
-        2,
-        LINE_AA,
-    )
-
-
 def draw_annotation_overlay(
     frame: Frame,
     annotation: Annotation | None,
@@ -142,13 +121,7 @@ def draw_annotation_overlay(
         )
 
         if is_valid_xywh(x, y, width, height):
-            cv2.rectangle(
-                frame,
-                (x, y),
-                (x + width, y + height),
-                GREEN,
-                2,
-            )
+            draw_bbox(frame, (x, y, width, height), GREEN)
             draw_text(frame, "VISIBLE", (10, 90), GREEN)
         else:
             draw_text(frame, "VISIBLE - INVALID BBOX", (10, 90), RED)
@@ -175,9 +148,9 @@ def make_display_frame(
     """Create a display frame with annotation and controls overlaid."""
     display = frame.copy()
 
-    draw_text(display, f"Frame {frame_index + 1} / {frame_count}", (10, 25))
-    draw_text(display, "Controls: n next | N +10 | p prev | P -10 | q quit", (10, 50))
-    draw_text(display, "Status:", (10, 75))
+    draw_text(display, f"Frame {frame_index + 1} / {frame_count}", (10, 25), WHITE)
+    draw_text(display, "Controls: n next | N +10 | p prev | P -10 | q quit", (10, 50), WHITE)
+    draw_text(display, "Status:", (10, 75), WHITE)
     draw_annotation_overlay(display, annotation)
 
     return display
