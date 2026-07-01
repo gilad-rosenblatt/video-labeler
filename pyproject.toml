@@ -6,7 +6,25 @@ build-backend = "setuptools.build_meta"
 name = "labeler"
 version = "0.1.0"
 description = "Interactive single-object video labeling and annotation validation tools"
+readme = "README.md"
 requires-python = ">=3.10"
+keywords = [
+    "computer-vision",
+    "video-labeling",
+    "annotation",
+    "opencv",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
 dependencies = [
     "numpy>=1.24",
     "opencv-contrib-python>=4.8",
@@ -14,6 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "Pillow>=10.0",
     "pytest>=8.0",
     "ruff>=0.5",
 ]
